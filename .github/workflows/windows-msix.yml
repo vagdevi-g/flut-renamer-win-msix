@@ -1,0 +1,55 @@
+name: Build and Release Windows MSIX
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-release-windows-msix:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          architecture: x64
+
+      - name: Install project dependencies
+        run: flutter pub get
+
+      - name: Enable Windows build
+        run: flutter config --enable-windows-desktop
+
+      - name: Build Windows artifacts
+        run: flutter build windows --release
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Enigma Virtual Box (evb)
+        run: npm install enigmavirtualbox -g
+
+      - name: Create EVB configuration file
+        run: dart .\dev\windows_evb_config_generator.dart
+
+      - name: Build single executable file
+        run: enigmavirtualbox cli "flut-renamer.evb"
+
+      - name: Set up MSIX Packaging Tool
+        uses: microsoft/setup-msix-packaging@v1
+        with:
+          channel: 'latest'
+
+      - name: Create MSIX package
+        run: msix-packaging create -i "build/windows/release/bundle" -o "build/windows/msix" -n "flut-renamer.msix"
+
+      - name: Upload MSIX Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: flut-renamer-msix
+          path: build/windows/msix/flut-renamer.msix
